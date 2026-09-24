@@ -33,6 +33,12 @@ spring:
 server:
   port: 8080
 
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   mail:
