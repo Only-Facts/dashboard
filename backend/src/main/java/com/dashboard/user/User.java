@@ -7,7 +7,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-
 import java.time.Instant;
 
 @Entity
@@ -28,7 +27,7 @@ public class User {
   private String passwordHash;
 
   @Column(name = "email_verified", nullable = false)
-  private boolean emailVerified = false;
+  private boolean emailVerified;
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
@@ -36,10 +35,7 @@ public class User {
   protected User() {
   }
 
-  public User(
-      String email,
-      String username,
-      String passwordHash) {
+  public User(String email, String username, String passwordHash) {
     this.email = email;
     this.username = username;
     this.passwordHash = passwordHash;
@@ -77,6 +73,6 @@ public class User {
   }
 
   public void verifyEmail() {
-    this.emailVerified = true;
+    emailVerified = true;
   }
 }

@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "app.token-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "spring.datasource.password=unused" })
 @AutoConfigureMockMvc
 @Testcontainers
-class DemoApplicationTests {
+class DashboardApplicationTests {
   @Container @ServiceConnection
   static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
   @Autowired MockMvc mvc;
@@ -81,13 +81,33 @@ class DemoApplicationTests {
     return json.readTree(result.getResponse().getContentAsString()).path("id").asLong();
   }
   @Test void catalogAndAuthenticationBoundary() throws Exception {
-    mvc.perform(get("/about.json")).andExpect(status().isOk()).andExpect(jsonPath("$.server.services.length()").value(5))
+    mvc.perform(get("/about.json")).andExpect(status().isOk()).andExpect(jsonPath("$.server.services.length()").value(6))
         .andExpect(jsonPath("$.client.host").isString()).andExpect(jsonPath("$.server.current_time").isNumber());
-    assertThat(catalog.services().stream().mapToInt(s -> s.widgets().size()).sum()).isEqualTo(12);
+    assertThat(catalog.services().stream().mapToInt(s -> s.widgets().size()).sum()).isEqualTo(18);
     mvc.perform(get("/api/widgets")).andExpect(status().isUnauthorized());
     mvc.perform(post("/api/widgets").session(first).contentType("application/json").content(widget("Paris"))).andExpect(status().isForbidden());
     mvc.perform(post("/api/auth/register").contentType("application/json").content("{}")).andExpect(status().isForbidden());
   }
+  @Test void expandedPublicCatalogCanBeAddedAndSteamDataUsesItsConfiguration() throws Exception {
+    for (var service : catalog.services()) {
+      if (service.oauth()) continue;
+      for (var type : service.widgets()) {
+        var config = type.params().stream().collect(java.util.stream.Collectors.toMap(Catalog.Param::name, Catalog.Param::defaultValue));
+        create(first, json.writeValueAsString(Map.of("service", service.name(), "type", type.name(),
+            "title", type.description(), "config", config, "refreshSeconds", 300)));
+      }
+    }
+    mvc.perform(get("/api/widgets").session(first)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(15));
+    when(provider.get(contains("GetNumberOfCurrentPlayers/v1/?appid=620")))
+        .thenReturn(json.readTree("{\"response\":{\"result\":1,\"player_count\":1234}}"));
+    long id = create(first, json.writeValueAsString(Map.of("service", "steam", "type", "players",
+        "title", "Portal 2 players", "config", Map.of("appid", "620"), "refreshSeconds", 60)));
+    mvc.perform(get("/api/widgets/" + id + "/data").session(first)).andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].value").value("1234"));
+    mvc.perform(delete("/api/services/steam").session(first).with(csrf())).andExpect(status().isNoContent());
+    mvc.perform(get("/api/widgets/" + id + "/data").session(first)).andExpect(status().isNotFound());
+  }
+
   @Test void ownershipCrudOrderingAndPersistence() throws Exception {
     long a = create(first, widget("Paris")), b = create(first, widget("Bordeaux"));
     mvc.perform(get("/api/widgets").session(login("first@example.com"))).andExpect(jsonPath("$.length()").value(2));
@@ -124,6 +144,35 @@ class DemoApplicationTests {
     mvc.perform(post("/api/auth/verify-email").with(csrf()).contentType("application/json").content(json.writeValueAsString(Map.of("token", token)))).andExpect(status().isBadRequest());
     login("new@example.com");
   }
+  @Test void verificationLinkCanBeReissuedWithoutAccountEnumeration() throws Exception {
+    String registration = json.writeValueAsString(Map.of(
+        "email", "pending@example.com",
+        "username", "pendinguser",
+        "password", PASSWORD));
+    mvc.perform(post("/api/auth/register").with(csrf()).contentType("application/json").content(registration))
+        .andExpect(status().isCreated());
+
+    var originalMessage = ArgumentCaptor.forClass(SimpleMailMessage.class);
+    verify(mail).send(originalMessage.capture());
+    String originalToken = originalMessage.getValue().getText().split("token=")[1].split("\\s")[0];
+
+    reset(mail);
+    mvc.perform(post("/api/auth/resend-verification").with(csrf()).contentType("application/json")
+        .content(json.writeValueAsString(Map.of("email", "pending@example.com"))))
+        .andExpect(status().isNoContent());
+    verify(mail).send(any(SimpleMailMessage.class));
+
+    mvc.perform(post("/api/auth/verify-email").with(csrf()).contentType("application/json")
+        .content(json.writeValueAsString(Map.of("token", originalToken))))
+        .andExpect(status().isBadRequest());
+
+    reset(mail);
+    mvc.perform(post("/api/auth/resend-verification").with(csrf()).contentType("application/json")
+        .content(json.writeValueAsString(Map.of("email", "missing@example.com"))))
+        .andExpect(status().isNoContent());
+    verifyNoInteractions(mail);
+  }
+
   @Test void emailFailureRollsBackRegistrationAndExpiredTokenFails() throws Exception {
     doThrow(new org.springframework.mail.MailSendException("private SMTP details")).when(mail).send(any(SimpleMailMessage.class));
     mvc.perform(post("/api/auth/register").with(csrf()).contentType("application/json").content(json.writeValueAsString(Map.of("email", "fail@example.com", "username", "failuser", "password", PASSWORD))))
