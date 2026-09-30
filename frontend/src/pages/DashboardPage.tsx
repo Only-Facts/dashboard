@@ -1,164 +1,115 @@
-
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
+import DashboardFeedback from "../components/dashboard/DashboardFeedback";
+import DashboardFooter from "../components/dashboard/DashboardFooter";
+import DashboardHeading from "../components/dashboard/DashboardHeading";
+import DashboardOverview from "../components/dashboard/DashboardOverview";
+import ServiceList from "../components/dashboard/ServiceList";
+import DashboardHeader from "../components/layout/DashboardHeader";
+import WidgetEditor from "../components/WidgetEditor";
+import { useAsyncAction } from "../hooks/useAsyncAction";
+import { useDashboardResources } from "../hooks/useDashboardResources";
+import { useServiceOperations } from "../hooks/useServiceOperations";
+import { useWidgetOperations } from "../hooks/useWidgetOperations";
+import type { DashboardTab, Widget } from "../types/dashboard";
+import { readGithubNotice } from "../utils/dashboard";
 
-import {
-  getBackendHealth,
-  type HealthResponse,
-} from "../api/healthApi";
+const MAX_WIDGETS = 30;
 
 export default function DashboardPage() {
-  const [health, setHealth] = useState<HealthResponse | null>(
-    null
-  );
+  const { user, signOut, refreshUser } = useAuth();
+  const navigate = useNavigate();
+  const resources = useDashboardResources();
+  const action = useAsyncAction(refreshUser);
+  const [tab, setTab] = useState<DashboardTab>("overview");
+  const [notice, setNotice] = useState(readGithubNotice);
+  const [editor, setEditor] = useState<Widget | "new" | null>(null);
 
-  const [loading, setLoading] = useState(true);
+  const run = async (task: () => Promise<void>) => {
+    if (notice === "Layout saved.") setNotice("");
+    return action.run(task);
+  };
 
-  const [error, setError] = useState<string | null>(null);
+  const widgetOperations = useWidgetOperations({
+    widgets: resources.widgets,
+    setWidgets: resources.setWidgets,
+    run,
+    onLayoutSaved: () => setNotice("Layout saved."),
+  });
+  const serviceOperations = useServiceOperations({ reload: resources.load, run });
 
   useEffect(() => {
-    let active = true;
-
-    async function loadBackendHealth() {
-      try {
-        const data = await getBackendHealth();
-
-        if (active) {
-          setHealth(data);
-          setError(null);
-        }
-      } catch {
-        if (active) {
-          setError("Cannot connect to Spring Boot");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
+    if (window.location.search) {
+      window.history.replaceState(window.history.state, "", "/");
     }
-
-    loadBackendHealth();
-
-    return () => {
-      active = false;
-    };
   }, []);
 
+  if (!user) return null;
+
+  const connectedCount = resources.services.filter((service) => service.connected).length;
+  const canAddWidget = connectedCount > 0 && resources.widgets.length < MAX_WIDGETS;
+  const error = action.error || resources.loadError;
+
   return (
-    <div className="flex min-h-screen bg-slate-950 text-white">
+    <div className="dashboard-shell">
+      <a href="#main-content" className="fixed left-3 top-[-100px] z-50 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-950 focus:top-3">
+        Skip to content
+      </a>
 
-      {/* Sidebar */}
-      <aside className="hidden w-64 flex-col border-r border-slate-800 bg-slate-900 p-6 md:flex">
+      <DashboardHeader
+        user={user}
+        tab={tab}
+        busy={action.busy}
+        onTabChange={setTab}
+        onSignOut={() => void run(async () => {
+          await signOut();
+          navigate("/login", { replace: true });
+        })}
+      />
 
-        <h1 className="mb-12 text-2xl font-bold">
-          Dashboard
-        </h1>
+      <main id="main-content" className="workspace-main">
+        <div className="workspace-container">
+          <DashboardHeading tab={tab} loading={resources.loading} busy={action.busy} canAddWidget={canAddWidget} onAdd={() => setEditor("new")} />
+          <DashboardFeedback
+            error={error}
+            notice={notice}
+            busy={action.busy}
+            onRetry={() => void run(resources.load)}
+            onRefreshSession={() => void refreshUser()}
+            onDismissNotice={() => setNotice("")}
+          />
 
-        <nav className="flex flex-col gap-2">
-
-          <a
-            href="#dashboard"
-            className="rounded-xl bg-slate-800 px-4 py-3 font-medium"
-          >
-            Overview
-          </a>
-
-          <a
-            href="#services"
-            className="rounded-xl px-4 py-3 text-slate-400 transition hover:bg-slate-800 hover:text-white"
-          >
-            Services
-          </a>
-
-          <a
-            href="#settings"
-            className="rounded-xl px-4 py-3 text-slate-400 transition hover:bg-slate-800 hover:text-white"
-          >
-            Settings
-          </a>
-
-        </nav>
-      </aside>
-
-      {/* Main content */}
-      <main
-        id="dashboard"
-        className="flex-1 p-6 md:p-10"
-      >
-
-        <header className="mb-10">
-
-          <h2 className="text-3xl font-bold">
-            My Dashboard
-          </h2>
-
-          <p className="mt-2 text-slate-400">
-            Your personal dashboard, all in one place.
-          </p>
-
-        </header>
-
-        {/* Backend status */}
-        <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-
-          <h3 className="mb-4 text-xl font-semibold">
-            System Status
-          </h3>
-
-          {loading && (
-            <p className="text-slate-400">
-              Connecting to backend...
-            </p>
+          {resources.loading ? (
+            <p role="status" className="mt-8 text-sm text-slate-400">Loading your workspace…</p>
+          ) : tab === "overview" ? (
+            <DashboardOverview
+              widgets={resources.widgets}
+              services={resources.services}
+              busy={action.busy}
+              canAddWidget={canAddWidget && !action.busy}
+              onAdd={() => setEditor("new")}
+              onOpenServices={() => setTab("services")}
+              onEdit={setEditor}
+              onMove={(index, direction) => void widgetOperations.move(index, direction)}
+              onDelete={(widget) => void widgetOperations.remove(widget)}
+            />
+          ) : (
+            <ServiceList services={resources.services} busy={action.busy} onToggle={(service) => void serviceOperations.toggle(service)} />
           )}
 
-          {error && (
-            <div className="rounded-xl bg-red-500/10 p-4 text-red-400">
-              {error}
-            </div>
-          )}
-
-          {health && (
-            <div className="flex items-center gap-3">
-
-              <div className="h-3 w-3 rounded-full bg-green-500" />
-
-              <div>
-                <p className="font-medium text-green-400">
-                  Backend: {health.status}
-                </p>
-
-                <p className="mt-1 text-sm text-slate-400">
-                  {health.message}
-                </p>
-              </div>
-
-            </div>
-          )}
-
-        </section>
-
-        {/* Dashboard widgets */}
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-8">
-
-          <h3 className="mb-3 text-xl font-semibold">
-            Your Widgets
-          </h3>
-
-          <p className="text-slate-400">
-            Your widgets will appear here.
-          </p>
-
-          <button
-            type="button"
-            disabled
-            className="mt-6 cursor-not-allowed rounded-xl bg-blue-600 px-5 py-3 font-medium opacity-60"
-          >
-            Add Widget — Coming Soon
-          </button>
-
-        </section>
-
+          <DashboardFooter />
+        </div>
       </main>
+
+      {editor && (
+        <WidgetEditor
+          services={resources.services}
+          widget={editor === "new" ? undefined : editor}
+          onClose={() => setEditor(null)}
+          onSave={(input) => widgetOperations.save(input, editor)}
+        />
+      )}
     </div>
   );
 }

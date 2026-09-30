@@ -1,0 +1,8 @@
+services:
+  db:
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-5434}:5432"
+
+  mailpit:
+    ports:
+      - "127.0.0.1:${MAIL_SMTP_HOST_PORT:-1026}:1025"
