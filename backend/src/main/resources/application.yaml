@@ -1,45 +1,64 @@
 spring:
   application:
     name: dashboard
-
   mail:
-    host: localhost
-    port: 1025
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
-      mail:
-        smtp:
-          auth: false
-          starttls:
-            enable: false
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
-
+      mail.smtp:
+        auth: ${MAIL_AUTH:false}
+        starttls.enable: ${MAIL_STARTTLS:false}
+        starttls.required: ${MAIL_STARTTLS:false}
+        connectiontimeout: 5000
+        timeout: 5000
+        writetimeout: 5000
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/dashboard}
     username: ${DB_USERNAME:dashboard}
-    password: ${DB_PASSWORD:dashboard_dev_password}
-    driver-class-name: org.postgresql.Driver
-
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+      connection-timeout: 5000
   jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
+    hibernate.ddl-auto: validate
     open-in-view: false
-
+    properties:
+      hibernate.jdbc.time_zone: UTC
   flyway:
     enabled: true
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
 
 server:
   port: 8080
-
+  forward-headers-strategy: none
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+  tomcat:
+    max-http-form-post-size: 16KB
+    max-swallow-size: 16KB
   servlet:
     session:
+      timeout: 30m
+      tracking-modes: cookie
       cookie:
+        name: DASHBOARD_SESSION
         http-only: true
         same-site: lax
+        secure: ${COOKIE_SECURE:false}
 
 app:
-  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  frontend-url: ${FRONTEND_URL:http://localhost:8080}
   mail:
     from: ${MAIL_FROM:no-reply@dashboard.local}
+  token-key: ${TOKEN_ENCRYPTION_KEY:}
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}
+    callback: ${GITHUB_CALLBACK_URL:http://localhost:8080/api/services/github/callback}
