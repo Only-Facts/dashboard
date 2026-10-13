@@ -54,11 +54,19 @@ server:
         secure: ${COOKIE_SECURE:false}
 
 app:
-  frontend-url: ${FRONTEND_URL:http://localhost:8080}
+  frontend-url: ${FRONTEND_URL:http://127.0.0.1:8080}
   mail:
     from: ${MAIL_FROM:no-reply@dashboard.local}
   token-key: ${TOKEN_ENCRYPTION_KEY:}
   github:
     client-id: ${GITHUB_CLIENT_ID:}
     client-secret: ${GITHUB_CLIENT_SECRET:}
-    callback: ${GITHUB_CALLBACK_URL:http://localhost:8080/api/services/github/callback}
+    callback: ${GITHUB_CALLBACK_URL:http://127.0.0.1:8080/api/services/github/callback}
+  twitch:
+    client-id: ${TWITCH_CLIENT_ID:}
+    client-secret: ${TWITCH_CLIENT_SECRET:}
+    callback: ${TWITCH_CALLBACK_URL:http://127.0.0.1:8080/api/services/twitch/callback}
+  spotify:
+    client-id: ${SPOTIFY_CLIENT_ID:}
+    client-secret: ${SPOTIFY_CLIENT_SECRET:}
+    callback: ${SPOTIFY_CALLBACK_URL:http://127.0.0.1:8080/api/services/spotify/callback}
