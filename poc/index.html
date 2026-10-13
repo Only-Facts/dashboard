@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard POC — Weather widget</title>
+  </head>
+  <body>
+    <main>
+      <h1>Configurable weather widget POC</h1>
+      <form id="weather-form">
+        <label>
+          City
+          <input id="city" name="city" value="Bordeaux" required maxlength="120" />
+        </label>
+        <button type="submit">Load temperature</button>
+      </form>
+      <section aria-live="polite">
+        <h2 id="location">No data yet</h2>
+        <p id="temperature">Submit a city to fetch real data.</p>
+        <p id="error" role="alert"></p>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
