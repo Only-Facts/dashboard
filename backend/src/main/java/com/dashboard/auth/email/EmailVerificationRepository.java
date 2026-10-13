@@ -1,4 +1,4 @@
-package com.dashboard.auth;
+package com.dashboard.auth.email;
 
 import jakarta.persistence.LockModeType;
 import java.util.Optional;

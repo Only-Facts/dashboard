@@ -1,10 +1,13 @@
-package com.dashboard.auth;
+package com.dashboard.auth.email;
 
-import com.dashboard.common.exception.ApiErrors;
-import com.dashboard.common.security.SecureTokens;
-import com.dashboard.user.User;
+import com.dashboard.auth.user.User;
+import com.dashboard.common.ApiErrors;
+import com.dashboard.common.SecureTokens;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,15 +19,21 @@ public class EmailVerificationService {
 
   private final EmailVerificationRepository tokens;
   private final SecureTokens secureTokens;
-  private final VerificationMailSender mail;
+  private final JavaMailSender mailSender;
+  private final String frontendUrl;
+  private final String mailFrom;
 
   public EmailVerificationService(
       EmailVerificationRepository tokens,
       SecureTokens secureTokens,
-      VerificationMailSender mail) {
+      JavaMailSender mailSender,
+      @Value("${app.frontend-url}") String frontendUrl,
+      @Value("${app.mail.from}") String mailFrom) {
     this.tokens = tokens;
     this.secureTokens = secureTokens;
-    this.mail = mail;
+    this.mailSender = mailSender;
+    this.frontendUrl = frontendUrl;
+    this.mailFrom = mailFrom;
   }
 
   @Transactional
@@ -38,7 +47,7 @@ public class EmailVerificationService {
         expiresAt());
 
     tokens.saveAndFlush(storedToken);
-    mail.send(user.getEmail(), clearToken);
+    send(user.getEmail(), clearToken);
   }
 
   @Transactional
@@ -72,5 +81,33 @@ public class EmailVerificationService {
 
   private RuntimeException invalidToken() {
     return ApiErrors.badRequest("Invalid or expired verification token");
+  }
+
+  private void send(String email, String token) {
+    SimpleMailMessage message = new SimpleMailMessage();
+    message.setFrom(mailFrom);
+    message.setTo(email);
+    message.setSubject("Confirm your Dashboard account");
+    message.setText(body(verificationUrl(token)));
+    mailSender.send(message);
+  }
+
+  private String verificationUrl(String token) {
+    String separator = frontendUrl.endsWith("/") ? "" : "/";
+    return frontendUrl + separator + "verify-email?token=" + token;
+  }
+
+  private String body(String verificationUrl) {
+    return """
+        Welcome to Dashboard!
+
+        Open this link, then confirm the verification in your browser:
+
+        %s
+
+        This link expires in 30 minutes.
+
+        If you did not create this account, ignore this email.
+        """.formatted(verificationUrl);
   }
 }

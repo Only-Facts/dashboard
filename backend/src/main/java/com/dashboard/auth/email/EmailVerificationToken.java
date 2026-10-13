@@ -1,6 +1,6 @@
-package com.dashboard.auth;
+package com.dashboard.auth.email;
 
-import com.dashboard.user.User;
+import com.dashboard.auth.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
