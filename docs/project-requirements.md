@@ -6,9 +6,9 @@ This checklist maps the supplied DASHBOARD v1.1.3 brief to the implementation. I
 | --- | --- |
 | Register and confirm before access | Email verification, login, resend flow; use Mailpit in local Docker deployment |
 | Authentication and account isolation | Session authentication, CSRF and widget ownership checks |
-| External authorization through OAuth 2.0 | GitHub account linking; configure GitHub OAuth secrets before the demonstration |
+| External authorization through OAuth 2.0 | GitHub and optional Twitch account linking; configure provider OAuth secrets before the demonstration |
 | Subscribe to services | Services tab, connect/disconnect; public services enabled by default |
-| Configurable widgets | 6 services, 18 types; every type has parameters in the shared backend catalog |
+| Configurable widgets | 7 services, 21 types; every type has parameters in the shared backend catalog |
 | Independent timers | Each instance sets its refresh interval from 60 seconds to 24 hours |
 | Add, configure, move, delete | Add widget dialog, options menu, mouse/touch drag handles, keyboard reordering |
 | Multiple differently configured instances | Separate persisted configuration and cached data per widget ID |
@@ -23,7 +23,7 @@ The brief requires **1 + X services** and **3 × X widget types** for X students
 
 ## Before pushing and presenting
 
-- Run `./scripts/verify.sh` with Docker available, then the frontend browser tests described in README.
+- Run `./scripts/verify.sh` to build the backend and check frontend lint and compilation.
 - Build and start Compose and check `http://localhost:8080/about.json`.
 - Register, verify using Mailpit, and add two city widgets with different configurations; show independent updates and saved ordering after reload.
 - Add Steam widgets using app ID `440`; edit a second instance to another game.

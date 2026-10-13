@@ -24,13 +24,13 @@ Security is designed around a same-origin web application. The React frontend is
 
 ## OAuth and third-party credentials
 
-- GitHub authorization uses OAuth state and a short-lived, session-bound attempt.
+- GitHub and Twitch authorization use separate OAuth state and short-lived, session-bound attempts.
 - PKCE (`S256`) binds the authorization code to the flow that initiated it.
 - OAuth attempts are single-use and expire after ten minutes.
-- The GitHub access token is validated before storage.
+- Access tokens are validated with their provider before storage.
 - Access tokens are encrypted with AES-256-GCM using a random nonce and user-specific additional authenticated data.
 - `TOKEN_ENCRYPTION_KEY` is supplied through the environment and must never be committed.
-- Disconnecting GitHub clears the stored encrypted token and deletes GitHub widgets.
+- Disconnecting GitHub or Twitch clears the stored encrypted token and deletes widgets for that service.
 
 ## External API / SSRF controls
 
@@ -40,7 +40,7 @@ The generic provider client does not accept arbitrary hosts. It permits HTTPS re
 - refuses redirects so an allowed host cannot silently redirect a credential-bearing request elsewhere;
 - uses connect and request timeouts;
 - rejects provider responses larger than 2 MB while they are being streamed;
-- never forwards the GitHub bearer token to non-GitHub requests.
+- never forwards a service bearer token to a different provider.
 
 Widget parameters are separately validated before a provider URL is built. Repository names, numeric limits and currency codes are constrained, while free-text search/city values are URL-encoded.
 
@@ -75,9 +75,9 @@ Before public deployment:
 
 1. Terminate TLS at a trusted reverse proxy and redirect HTTP to HTTPS.
 2. Set `COOKIE_SECURE=true`.
-3. Use a secrets manager for the database password, SMTP credentials, GitHub client secret and token-encryption key.
+3. Use a secrets manager for the database password, SMTP credentials, OAuth client secrets and token-encryption key.
 4. Use a production SMTP provider rather than Mailpit.
 5. Put a shared rate limiter / WAF in front of the application if running multiple backend replicas.
 6. Back up PostgreSQL and test restoration.
 7. Monitor failed authentication/provider requests without logging passwords, verification tokens, OAuth codes or bearer tokens.
-8. Rotate GitHub and encryption secrets through a documented incident procedure. Rotating the AES key invalidates existing encrypted GitHub connections unless a key-version migration is implemented.
+8. Rotate OAuth and encryption secrets through a documented incident procedure. Rotating the AES key invalidates existing encrypted connections unless a key-version migration is implemented.

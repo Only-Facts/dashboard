@@ -73,14 +73,21 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, publicPostEndpoints()).permitAll()
             .anyRequest().authenticated())
         .exceptionHandling(exception -> exception
-            .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+            .authenticationEntryPoint((request, response, authenticationFailure) -> {
+              if ("/api/services/spotify/callback".equals(request.getRequestURI())) {
+                response.setStatus(HttpStatus.SEE_OTHER.value());
+                response.setHeader("Location", "/login?spotify=session_required");
+              } else {
+                response.setStatus(HttpStatus.UNAUTHORIZED.value());
+              }
+            }))
         .formLogin(AbstractHttpConfigurer::disable)
         .httpBasic(AbstractHttpConfigurer::disable)
         .logout(AbstractHttpConfigurer::disable);
   }
 
   private String[] publicGetEndpoints() {
-    return new String[]{"/api/health", "/api/auth/csrf", "/about.json"};
+    return new String[]{"/api/health", "/api/auth/csrf", "/api/public/**", "/about.json"};
   }
 
   private String[] publicPostEndpoints() {

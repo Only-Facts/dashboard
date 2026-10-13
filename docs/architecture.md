@@ -20,30 +20,29 @@ Nginx gives the browser a single origin. This avoids broad CORS rules and lets t
 
 ## Backend modules
 
-The backend is split by responsibility instead of putting controller, validation, persistence and provider logic in the same classes.
+The backend has three feature areas and two shared support packages:
 
-- `about`: exposes the project-required `/about.json` metadata.
-- `auth`: thin auth facade plus focused registration, login, verification-mail and session services.
-- `common.security`: small shared security primitives such as authenticated-user extraction and secure token generation/hashing.
-- `config`: Spring Security wiring, request-size checks and a separate in-memory API rate limiter.
-- `dashboard`: widget use-cases and catalog API. Catalog definitions and widget-configuration validation are isolated from orchestration.
-- `dashboard.persistence`: JDBC-only repositories, JSON config serialization and row mapping.
-- `service`: service subscription lifecycle and separate GitHub callback/controller responsibilities.
-- `integration`: outbound provider access, URL encoding and encrypted third-party token handling.
-- `integration.http`: the external-host allow-list policy used by the provider HTTP client.
-- `integration.oauth`: GitHub OAuth transport and short-lived state/PKCE session handling.
-- `integration.widget`: one provider per external service plus small API helpers where a provider has several endpoints (for example Weather and Steam).
-- `user`: user entity/repository plus the small row-lock repository used to serialize per-user mutations.
+- `auth`: `AuthController` handles login/logout sessions and HTTP endpoints. `AuthService` owns registration, credential checks and API records. `auth.email` contains email verification and delivery; `auth.user` contains the user entity and repository.
+- `dashboard`: `DashboardController` exposes widget CRUD, service connections, health and metadata endpoints. `DashboardService` owns widget and subscription rules. `DashboardRepository` contains their SQL and the per-user mutation lock. `Catalog` contains service definitions and configuration validation. `dashboard.github` and `dashboard.twitch` handle separate OAuth flows and encrypted tokens.
+- `widget`: `WidgetDataService` fetches and caches widget data. `ProviderClient` handles HTTP, allowed hosts and response-size limits. `LocationResolver` shares city lookup between weather and air quality. `providers` contains one implementation per external service, including its endpoint calls.
+- `config`: Spring Security configuration and the request-limit filter.
+- `common`: JSON API errors and shared secure-token operations.
 
-Controllers do not contain persistence or provider business logic. `WidgetDataService` resolves a provider by service identifier and caches successful responses for a short period. Widget configuration is always loaded through an ownership-scoped database query before provider data is fetched.
+There are 29 production Java files. Controllers call services directly; single-use helpers stay inside their owning classes. The six provider implementations remain separate because each external API has different request and response formats.
+
+Widget configuration is always loaded through an ownership-scoped database query before provider data is fetched. Successful provider responses are cached briefly; dashboard changes evict that user's cached data.
 
 ## Frontend modules
 
-- `api`: typed functions for the same-origin REST API and centralized error handling/CSRF requests.
-- `auth`: React context for current-user state.
-- `pages`: route-level login, registration, verification, resend and dashboard screens.
-- `components`: auth shell, dashboard navigation, service cards, widget editor and widget cards.
-- `hooks/useWidgetData`: the timer mechanism. Each mounted widget schedules its own refresh using its configured `refreshSeconds` value, pauses useful network work while the page is hidden, supports manual refresh, and aborts outstanding work on unmount.
+The frontend has 33 source files organized around the screens and features they implement:
+
+- `api`: request/response types live beside the auth and dashboard API calls. `http.ts` handles requests, CSRF and HTTP errors together.
+- `auth`: authentication context/provider and shared form layout.
+- `pages`: login, registration, verification, resend and dashboard screens. Page-specific forms and messages live with their page.
+- `dashboard`: navigation, service cards and one `useDashboard` hook for loading, mutations, errors and optimistic reordering.
+- `widgets`: the card, editor, draggable grid, shared data formatting and refresh hook. `registry.ts` defines each widget's view, icon and size in one place; `views` groups the 18 views into six service files.
+
+`App.tsx` contains routes, the authentication guard and the not-found screen. Widget cards render their markup directly. Each mounted widget schedules its own refresh, pauses network work while the page is hidden, supports manual refresh, and aborts outstanding work on unmount.
 
 ## Dashboard data ownership
 
@@ -53,6 +52,6 @@ A per-user row lock is taken for mutations that could otherwise race (create, re
 
 ## Service model
 
-Public services are available by default, but users can explicitly disconnect/reconnect them. GitHub is unavailable until the server has OAuth configuration, and it remains disconnected for a user until that user completes the OAuth flow.
+Public services are available by default, but users can explicitly disconnect/reconnect them. GitHub and Twitch are unavailable until their respective OAuth configuration is present, and each remains disconnected for a user until that user completes its OAuth flow.
 
 Disconnecting a service removes its widget instances to prevent stale widgets from retaining access to a service that the user deliberately disconnected.

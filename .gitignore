@@ -7,13 +7,12 @@
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
-frontend/playwright-report/
-frontend/test-results/
 frontend/*.tsbuildinfo
 
 # Backend generated files
 backend/.gradle/
 backend/build/
+backend/bin/
 
 # Editors / operating system
 .idea/
@@ -25,6 +24,5 @@ Thumbs.db
 # Logs
 *.log
 
-# Local source archives and test output
+# Local source archives
 /frontend.zip
-/test-results/

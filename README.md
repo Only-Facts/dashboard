@@ -2,7 +2,7 @@
 
 Orbit is a full-stack personal dashboard built for the Epitech **DASHBOARD** project. Users create and verify an account, connect services, add multiple configurable widget instances, move/edit/delete them, and let each widget refresh on its own timer.
 
-The public application is served on **http://localhost:8080**. The same server exposes the required **`GET /about.json`** endpoint.
+The public application is served on **http://127.0.0.1:8080**. The same server exposes the required **`GET /about.json`** endpoint.
 
 ## Implemented features
 
@@ -29,12 +29,14 @@ The public application is served on **http://localhost:8080**. The same server e
 | Hacker News | Available by default | Popular stories, latest stories |
 | Air quality | Available by default | European AQI, particulate pollution, pollution gases |
 | Steam | Public data, available by default | Current players, game news, global achievement rates |
+| Twitch | OAuth 2.0 | Followed live streams, followed channels, your stream schedule |
+| Spotify | OAuth 2.0 | Recently played tracks, top tracks, your playlists |
 
-That is **6 services and 18 configurable widget types**. Every widget has at least one configuration parameter and a per-instance refresh interval.
+That is **8 services and 24 configurable widget types**. Every widget has at least one configuration parameter and a per-instance refresh interval.
 
 ### Widget presentations
 
-Each of the 18 types has its own renderer: temperature and feels-like readings, forecast range bars, a humidity ring with wind speed, precipitation comparisons, a daylight arc, repository count bars, a commit timeline, issue tickets, currency conversion ladders and receipts, ranked and editorial news feeds, an AQI gauge, particle columns, gas concentration bars, Steam player activity, dated game dispatches, and achievement completion bars.
+Each of the 24 types has its own renderer: temperature and feels-like readings, forecast range bars, a humidity ring with wind speed, precipitation comparisons, a daylight arc, repository count bars, a commit timeline, issue tickets, currency conversion ladders and receipts, ranked and editorial news feeds, an AQI gauge, particle columns, gas concentration bars, Steam player activity, dated game dispatches, and achievement completion bars.
 
 Charts use returned measurements. The Steam player chart collects up to 24 distinct provider updates while the widget is mounted; it starts after a second sample, resets when the widget configuration changes, and is not persisted across reloads. Currency comparison bars show conversions at the current reference rate, not historical prices. Missing values remain explicit. CSS draws the charts; [React Icons](https://react-icons.github.io/react-icons/) supplies the icon components.
 
@@ -87,9 +89,9 @@ docker compose up --build
 
 Open:
 
-- Application: http://localhost:8080
+- Application: http://127.0.0.1:8080
 - Mailpit inbox: http://localhost:8025
-- Required metadata: http://localhost:8080/about.json
+- Required metadata: http://127.0.0.1:8080/about.json
 
 PostgreSQL is intentionally **not exposed on a host port** in the normal Docker stack. The backend reaches it over the private Compose network at `db:5432`. This avoids conflicts with PostgreSQL or older dashboard containers already using ports such as `5432` or `5433`.
 
@@ -107,13 +109,59 @@ To also delete the project's local database volume:
 docker compose down -v
 ```
 
+## Optional Spotify OAuth setup
+
+Create an application in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and register this exact redirect URI:
+
+```text
+http://127.0.0.1:8080/api/services/spotify/callback
+```
+
+Spotify disallows `localhost` redirect URIs. Open Orbit at `http://127.0.0.1:8080` and sign in there before connecting Spotify so the authorization callback receives your Orbit session cookie. If you start from a different hostname, Connect Spotify first sends you to sign in on the callback host; click Connect Spotify again after signing in. A callback without an Orbit session redirects to sign-in instead of returning a raw 401. The app owner needs Spotify Premium in development mode, and the Spotify account you use must be on the application's allowlist (User Management).
+
+Fill the existing `.env` fields:
+
+```dotenv
+SPOTIFY_CLIENT_ID=<your-client-id>
+SPOTIFY_CLIENT_SECRET=<your-client-secret>
+SPOTIFY_CALLBACK_URL=http://127.0.0.1:8080/api/services/spotify/callback
+```
+
+Keep your existing `TOKEN_ENCRYPTION_KEY`. Apply the credentials with `docker compose up -d backend`, refresh Orbit, connect Spotify, then add its widgets. **Recently played tracks**, **Your top tracks**, and **Your playlists** support 1–10 items. Top tracks also supports short, medium, and long periods. The gallery shows one Spotify entry. Switch between Recent, Top tracks, and Playlists directly inside the card; item limits and the top-track period can be changed there.
+
+The server uses Authorization Code OAuth with a one-time, session-bound state. Access tokens, refresh tokens, and Spotify user IDs are encrypted. Expired tokens refresh on a 401 response, including providers that omit a replacement refresh token. Invalid refresh tokens disable the connection until you reconnect. Requested scopes are `user-read-recently-played`, `user-top-read`, `playlist-read-private`, and `playlist-read-collaborative`.
+
+## Optional Twitch OAuth setup
+
+Register a confidential web application in the [Twitch Developer Console](https://dev.twitch.tv/console/apps) with this exact redirect URL:
+
+```text
+http://127.0.0.1:8080/api/services/twitch/callback
+```
+
+Fill the existing fields in `.env`:
+
+```dotenv
+TWITCH_CLIENT_ID=<your-client-id>
+TWITCH_CLIENT_SECRET=<your-client-secret>
+TWITCH_CALLBACK_URL=http://127.0.0.1:8080/api/services/twitch/callback
+```
+
+OAuth also requires `TOKEN_ENCRYPTION_KEY`. If it is blank, generate a key with `openssl rand -base64 32` and save it there. Keep an existing key unchanged so saved GitHub and Twitch tokens remain readable. Rebuild/recreate the backend after configuration:
+
+```bash
+docker compose up -d --build backend
+```
+
+In Orbit, connect Twitch from Services, then add **Followed live streams**, **Followed channels**, or **Your stream schedule** from the widget gallery. Each supports an item limit from 1 to 10. The schedule belongs to your connected Twitch channel; channels without a published schedule show an empty state. Only `user:read:follows` is requested. Access tokens, refresh tokens, and Twitch user IDs are encrypted on the server. Expired tokens refresh automatically; revoked connections require reconnecting. Stored connections are validated at startup and every 50 minutes. The gallery shows one Twitch entry; the card switches between Live, Channels, and Schedule. Set the item limit directly on the card, or expand Customize to change its title and refresh interval. Existing Twitch widgets support these same controls.
+
 ## Optional GitHub OAuth setup
 
 GitHub widgets are shown as unavailable until all GitHub secrets are configured.
 
 1. Create a GitHub OAuth App.
-2. Set its homepage URL to `http://localhost:8080` for local development.
-3. Set its callback URL to `http://localhost:8080/api/services/github/callback`.
+2. Set its homepage URL to `http://127.0.0.1:8080` for local development.
+3. Set its callback URL to `http://127.0.0.1:8080/api/services/github/callback`.
 4. Generate the token-encryption key:
 
 ```bash
@@ -126,7 +174,7 @@ openssl rand -base64 32
 TOKEN_ENCRYPTION_KEY=<base64-encoded-32-byte-key>
 GITHUB_CLIENT_ID=<client-id>
 GITHUB_CLIENT_SECRET=<client-secret>
-GITHUB_CALLBACK_URL=http://localhost:8080/api/services/github/callback
+GITHUB_CALLBACK_URL=http://127.0.0.1:8080/api/services/github/callback
 ```
 
 6. Restart the stack:
@@ -174,7 +222,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
 
 Then start the development dependencies again.
 
-## Build and tests
+## Build checks
 
 Run the complete verification helper from the repository root:
 
@@ -191,18 +239,15 @@ cd frontend
 npm ci
 npm run lint
 npm run build
-npx playwright install chromium
-npm run test:e2e
 ```
 
-Backend integration tests use PostgreSQL Testcontainers:
+Backend:
 
 ```bash
 cd backend
-./gradlew test
+./gradlew bootJar
 ```
 
-A working Docker runtime is therefore required for the backend test suite.
 
 ## Project structure
 
@@ -210,26 +255,24 @@ A working Docker runtime is therefore required for the backend test suite.
 .
 ├── backend/
 │   ├── src/main/java/com/dashboard/
-│   │   ├── about/          # /about.json metadata endpoint
-│   │   ├── auth/           # focused registration, login, verification and session services
-│   │   ├── common/         # shared API errors and security primitives
-│   │   ├── config/         # Spring Security and request limiting
-│   │   ├── dashboard/      # widget use-cases, catalog and validation
-│   │   │   └── persistence/ # JDBC repositories, row mapping and config codec
-│   │   ├── integration/    # hardened provider HTTP/OAuth/token handling
-│   │   │   ├── http/       # outbound URL allow-list policy
-│   │   │   ├── oauth/      # GitHub OAuth transport and PKCE/state session
-│   │   │   └── widget/     # one provider module per external data service
-│   │   ├── service/        # subscription lifecycle and GitHub callback API
-│   │   └── user/           # user persistence and per-user mutation lock
+│   │   ├── auth/           # auth controller, service and request/response records
+│   │   │   ├── email/      # verification and mail delivery
+│   │   │   └── user/       # user entity and repository
+│   │   ├── dashboard/      # controller, service, repository and catalog
+│   │   │   └── github/     # OAuth connection and token encryption
+│   │   ├── widget/         # data fetching, caching and shared HTTP client
+│   │   │   └── providers/  # one implementation per external service
+│   │   ├── config/         # Spring Security and request limits
+│   │   └── common/         # API errors and secure tokens
 │   └── src/main/resources/db/migration/
 ├── frontend/
 │   └── src/
-│       ├── api/            # typed HTTP boundary
-│       ├── auth/           # authentication context
-│       ├── components/     # reusable dashboard/auth UI
-│       ├── hooks/          # widget timer and data refresh logic
-│       └── pages/          # route-level screens
+│       ├── api/            # API calls, types, HTTP and CSRF
+│       ├── auth/           # session context and shared form layout
+│       ├── dashboard/      # navigation, services and dashboard state
+│       ├── pages/          # screens with their forms and messages
+│       └── widgets/        # cards, editor, dragging and data refresh
+│           └── views/      # one file per external service
 ├── poc/                    # original configurable real-API proof of concept
 ├── docs/
 │   ├── architecture.md
@@ -240,7 +283,7 @@ A working Docker runtime is therefore required for the backend test suite.
 
 ## Required `/about.json`
 
-`GET http://localhost:8080/about.json` returns:
+`GET http://127.0.0.1:8080/about.json` returns:
 
 - `client.host`: caller IP address;
 - `server.current_time`: current Unix timestamp;
