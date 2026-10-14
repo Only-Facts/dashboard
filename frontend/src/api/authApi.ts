@@ -1,10 +1,4 @@
 import { ApiError, request } from "./http";
-import type {
-  LoginRequest,
-  RegisterRequest,
-  RegisterResponse,
-  User,
-} from "../types/auth";
 
 export const register = (body: RegisterRequest) =>
   request<RegisterResponse>("/api/auth/register", {
@@ -51,3 +45,23 @@ export async function getCurrentUser(): Promise<User | null> {
 
 export const logout = () =>
   request<void>("/api/auth/logout", { method: "POST" });
+
+export interface User {
+  id: number;
+  email: string;
+  username: string;
+  emailVerified: boolean;
+}
+
+interface RegisterRequest {
+  email: string;
+  username: string;
+  password: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+type RegisterResponse = User;

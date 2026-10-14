@@ -13,10 +13,11 @@ export default defineConfig({
     port: 5173,
 
     proxy: {
-      "/about.json": { target: "http://localhost:8080" },
+      "/about.json": { target: "http://127.0.0.1:8080" },
       "/api": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
+        target: "http://127.0.0.1:8080",
+        // OAuth checks must see the browser hostname so its session survives the callback.
+        changeOrigin: false,
       },
     },
   },
